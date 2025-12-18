@@ -22,7 +22,6 @@ graph TB
     end
 
     subgraph "Compute Layer"
-        ChatLambda[Chat Handler Lambda]
         RAGLambda[RAG Orchestrator Lambda]
         ActionLambda[Safe Actions Lambda]
         IngestionLambda[Document Ingestion Lambda]
@@ -58,10 +57,9 @@ graph TB
     AdminUI --> APIGW
     APIGW --> Cognito
     WSAPI --> Cognito
-    APIGW --> ChatLambda
+    APIGW -->|Simple Chat| Bedrock
     APIGW --> ActionLambda
     WSAPI --> RAGLambda
-    ChatLambda --> RAGLambda
     RAGLambda --> Bedrock
     RAGLambda --> OpenSearch
     RAGLambda --> BedrockEmbed
@@ -74,11 +72,26 @@ graph TB
     S3Docs --> EventBridge
     EventBridge --> StepFn
     StepFn --> IngestionLambda
-    ChatLambda --> DynamoDB
+    RAGLambda --> DynamoDB
     DynamoDB --> KMS
     S3Docs --> KMS
     OpenSearch --> KMS
 ```
+
+### Architecture Notes
+
+**Direct API Gateway to Bedrock Integration:**
+For simple chat requests that don't require RAG (retrieval), API Gateway can invoke Bedrock directly using AWS service integrations. This eliminates Lambda cold starts and reduces latency for straightforward Q&A.
+
+**When to use direct integration:**
+- Simple conversational queries
+- Follow-up questions in existing context
+- Requests that don't need knowledge base retrieval
+
+**When to use Lambda (RAG Orchestrator):**
+- Queries requiring knowledge base search
+- Complex multi-step reasoning with citations
+- Requests needing conversation history from DynamoDB
 
 ### Project Directory Structure
 
@@ -178,9 +191,11 @@ Handles all client-facing API endpoints.
 | WebSocketApi | API Gateway | Real-time chat streaming |
 | CognitoAuthorizer | API Gateway | JWT validation |
 | UsagePlan | API Gateway | Rate limiting per tenant |
+| BedrockIntegration | API Gateway | Direct Bedrock invocation for simple chat |
 
 **REST API Endpoints:**
-- `POST /chat` - Send chat message
+- `POST /chat` - Send chat message (direct to Bedrock for simple queries)
+- `POST /chat/rag` - Send chat message with RAG retrieval (via Lambda)
 - `GET /conversations/{id}` - Get conversation history
 - `POST /tickets` - Create ticket
 - `GET /tickets` - List tickets
@@ -191,20 +206,23 @@ Handles all client-facing API endpoints.
 **WebSocket Routes:**
 - `$connect` - Establish connection with auth
 - `$disconnect` - Clean up connection
-- `chat` - Stream chat responses
+- `chat` - Stream chat responses (via RAG Lambda for knowledge-grounded responses)
 - `status` - Receive action status updates
+
+**Direct Bedrock Integration:**
+The `/chat` endpoint uses API Gateway AWS service integration to invoke Bedrock directly, bypassing Lambda for simple conversational queries. This reduces latency by eliminating cold starts. The integration uses VTL templates to transform requests/responses and applies Bedrock Guardrails for content safety.
 
 ### Compute Stack
 
-Lambda functions for business logic.
+Lambda functions for business logic. Note: Simple chat requests bypass Lambda entirely via direct API Gateway to Bedrock integration.
 
 | Function | Memory | Timeout | Purpose |
 |----------|--------|---------|---------|
-| ChatHandler | 512 MB | 30s | Process chat requests, route to RAG |
-| RAGOrchestrator | 1024 MB | 60s | Vector search + Bedrock generation |
-| SafeActions | 256 MB | 15s | Execute approved actions |
+| RAGOrchestrator | 1024 MB | 60s | Vector search + Bedrock generation with citations |
+| SafeActions | 256 MB | 15s | Execute approved actions (create ticket, escalate, etc.) |
 | DocumentIngestion | 1024 MB | 300s | Chunk, embed, index documents |
 | WebSocketHandler | 256 MB | 10s | Manage WebSocket connections |
+| ConversationPersist | 256 MB | 10s | Save conversation history to DynamoDB |
 
 **Lambda Environment Variables:**
 - `TICKETS_TABLE_NAME`
@@ -213,6 +231,9 @@ Lambda functions for business logic.
 - `OPENSEARCH_ENDPOINT`
 - `BEDROCK_MODEL_ID`
 - `KMS_KEY_ARN`
+
+**Why no ChatHandler Lambda?**
+Simple chat requests use API Gateway's direct AWS service integration with Bedrock, eliminating Lambda cold starts and reducing P99 latency. The RAGOrchestrator Lambda is only invoked when knowledge base retrieval is needed.
 
 ### AI Stack
 
