@@ -488,6 +488,81 @@ The following properties can be verified by testing the synthesized CloudFormati
 
 **Validates: Requirements 8.1**
 
+## Phase 2: Voice Extension (Future)
+
+Per the product direction, voice is added as an interaction layer after chat behavior is proven. This section documents the planned architecture for reference, but is **not in scope for Phase 1 implementation**.
+
+### Voice Architecture Principles
+
+1. **Voice reuses chat orchestration** - No new intelligence layer; voice is just another input/output modality
+2. **All voice interactions produce chat transcripts** - Same audit trail and logging
+3. **Actions still require confirmation** - Spoken and visual confirmation for safe actions
+
+### Voice Components (Phase 2)
+
+| Component | AWS Service | Purpose |
+|-----------|-------------|---------|
+| ContactCenter | Amazon Connect | Phone-based support, IVR, agent routing |
+| SpeechToText | Amazon Transcribe | Real-time speech transcription |
+| TextToSpeech | Amazon Polly | Convert AI responses to speech |
+| IntentClassification | Amazon Lex | Detect intents, slot filling, conversation flow |
+
+### Why Amazon Connect + Lex?
+
+**Amazon Connect** provides:
+- Managed contact center with phone numbers
+- Contact flows for routing and IVR
+- Agent workspace integration
+- Built-in recording and analytics
+
+**Amazon Lex** provides:
+- Intent recognition from speech/text
+- Slot filling for structured data extraction
+- Seamless integration with Connect contact flows
+- Lambda fulfillment hooks (reuses our existing RAG Lambda)
+
+### Voice Flow (Phase 2)
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Connect as Amazon Connect
+    participant Lex as Amazon Lex
+    participant Transcribe as Amazon Transcribe
+    participant RAG as RAG Lambda
+    participant Polly as Amazon Polly
+    
+    Caller->>Connect: Phone call
+    Connect->>Transcribe: Stream audio
+    Transcribe->>Lex: Transcribed text
+    Lex->>RAG: Intent + slots
+    RAG->>RAG: Vector search + Bedrock
+    RAG->>Lex: Response with citations
+    Lex->>Polly: Text response
+    Polly->>Connect: Audio stream
+    Connect->>Caller: Spoken response
+```
+
+### Integration Points
+
+The voice layer connects to existing Phase 1 infrastructure:
+- **RAG Lambda** - Same function handles voice and chat queries
+- **DynamoDB** - Voice conversations stored as chat transcripts
+- **Bedrock Guardrails** - Same content safety for voice responses
+- **CloudWatch** - Voice metrics alongside chat metrics
+
+### Phase 2 CDK Additions (Not in Phase 1 Scope)
+
+```
+infrastructure/lib/stacks/
+├── voice-stack.ts           # Connect, Lex, Transcribe, Polly
+└── ...existing stacks
+```
+
+This design ensures voice can be added without re-architecting the core AI and data layers.
+
+---
+
 ## Error Handling
 
 ### CDK Synthesis Errors
