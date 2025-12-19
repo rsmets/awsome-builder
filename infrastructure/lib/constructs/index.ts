@@ -7,4 +7,5 @@ export const CONSTRUCTS_VERSION = '0.1.0';
 // Constructs will be exported here as they are implemented
 // export * from './tenant-isolated-table';
 // export * from './secure-bucket';
-// export * from './secure-kms-key';
+export * from './secure-kms-key';
+export * from './cognito-auth';
