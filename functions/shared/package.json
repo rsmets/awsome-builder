@@ -1,0 +1,17 @@
+{
+  "name": "@flowops/functions-shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@flowops/common": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2"
+  }
+}

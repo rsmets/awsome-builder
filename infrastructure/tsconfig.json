@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "lib",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@flowops/common/*": ["../packages/common/src/*"],
+      "@flowops/infrastructure/*": ["lib/*"]
+    }
+  },
+  "include": [
+    "bin/**/*",
+    "lib/**/*",
+    "config/**/*",
+    "test/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "cdk.out"
+  ]
+}
