@@ -21,7 +21,7 @@ exports.STACKS_VERSION = void 0;
 exports.STACKS_VERSION = '0.1.0';
 // Stacks will be exported here as they are implemented
 __exportStar(require("./foundation-stack"), exports);
-// export * from './data-stack';
+__exportStar(require("./data-stack"), exports);
 // export * from './compute-stack';
 // export * from './ai-stack';
 // export * from './api-stack';

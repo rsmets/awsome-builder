@@ -19,9 +19,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CONSTRUCTS_VERSION = void 0;
 // Placeholder export to make this a valid module
 exports.CONSTRUCTS_VERSION = '0.1.0';
-// Constructs will be exported here as they are implemented
-// export * from './tenant-isolated-table';
-// export * from './secure-bucket';
+// Security constructs
 __exportStar(require("./secure-kms-key"), exports);
 __exportStar(require("./cognito-auth"), exports);
+// Data constructs
+__exportStar(require("./secure-bucket"), exports);
+__exportStar(require("./tenant-isolated-table"), exports);
+__exportStar(require("./flowops-tables"), exports);
+__exportStar(require("./vector-search"), exports);
 //# sourceMappingURL=index.js.map

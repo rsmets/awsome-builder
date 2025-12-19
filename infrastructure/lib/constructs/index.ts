@@ -4,8 +4,12 @@
 // Placeholder export to make this a valid module
 export const CONSTRUCTS_VERSION = '0.1.0';
 
-// Constructs will be exported here as they are implemented
-// export * from './tenant-isolated-table';
-// export * from './secure-bucket';
+// Security constructs
 export * from './secure-kms-key';
 export * from './cognito-auth';
+
+// Data constructs
+export * from './secure-bucket';
+export * from './tenant-isolated-table';
+export * from './flowops-tables';
+export * from './vector-search';

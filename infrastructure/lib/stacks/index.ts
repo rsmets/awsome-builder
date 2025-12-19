@@ -6,7 +6,7 @@ export const STACKS_VERSION = '0.1.0';
 
 // Stacks will be exported here as they are implemented
 export * from './foundation-stack';
-// export * from './data-stack';
+export * from './data-stack';
 // export * from './compute-stack';
 // export * from './ai-stack';
 // export * from './api-stack';
