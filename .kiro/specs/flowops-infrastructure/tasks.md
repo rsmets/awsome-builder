@@ -90,20 +90,20 @@
 - [ ] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement Compute Stack (Lambda Functions)
-  - [ ] 5.1 Create shared Lambda function construct
+- [x] 5. Implement Compute Stack (Lambda Functions)
+  - [x] 5.1 Create shared Lambda function construct
     - Create base construct with common configuration
     - Configure X-Ray tracing enabled
     - Set up CloudWatch log group with retention
     - Configure VPC placement if needed
     - _Requirements: 6.1, 6.2_
-  - [ ] 5.2 Create Agent Invoke Lambda
+  - [x] 5.2 Create Agent Invoke Lambda
     - Create function with 1024MB memory and 60s timeout
     - Look up tenant agent config from DynamoDB
     - Invoke tenant's Strands agent via AgentCore API
     - Grant permissions to Bedrock AgentCore, DynamoDB
     - _Requirements: 2.5.2, 4.1_
-  - [ ] 5.3 Create Safe Actions Lambda
+  - [x] 5.3 Create Safe Actions Lambda
     - Create function with 256MB memory and 15s timeout
     - Configure permissions for DynamoDB and SNS
     - _Requirements: 4.5_
@@ -127,12 +127,12 @@
     - **Property 12: Lambda Observability Configuration**
     - **Validates: Requirements 6.1, 6.2**
 
-- [ ] 6. Implement AI Stack (Bedrock Configuration and AgentCore)
-  - [ ] 6.1 Create Bedrock model access configuration
+- [x] 6. Implement AI Stack (Bedrock Configuration and AgentCore)
+  - [x] 6.1 Create Bedrock model access configuration
     - Configure access to Claude 3 Sonnet for generation
     - Configure access to Titan Embed Text v2 for embeddings
     - _Requirements: 2.2, 2.4_
-  - [ ] 6.2 Create Bedrock Guardrail
+  - [x] 6.2 Create Bedrock Guardrail
     - Configure content filters for harmful content
     - Set up denied topics (personal advice, medical/legal)
     - Configure PII handling
@@ -160,13 +160,13 @@
     - **Property 16: Agent Configuration Table Structure**
     - **Validates: Requirements 2.5.1, 2.5.5**
 
-- [ ] 7. Implement API Stack (Gateway Layer)
-  - [ ] 7.1 Create REST API with Cognito authorizer
+- [x] 7. Implement API Stack (Gateway Layer)
+  - [x] 7.1 Create REST API with Cognito authorizer
     - Create API Gateway REST API
     - Configure Cognito authorizer for JWT validation
     - Set up request validators
     - _Requirements: 7.1, 7.2_
-  - [ ] 7.2 Configure Lambda integrations for agent and actions
+  - [x] 7.2 Configure Lambda integrations for agent and actions
     - Create /chat endpoint with Agent Invoke Lambda integration
     - Create /actions/{type} endpoint with Safe Actions Lambda
     - Create CRUD endpoints for tickets, documents, conversations
@@ -195,16 +195,16 @@
     - **Property 10: TLS Enforcement on API Endpoints**
     - **Validates: Requirements 5.3**
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Implement Orchestration Stack (Workflows and Events)
-  - [ ] 9.1 Create EventBridge event bus and rules
+- [x] 9. Implement Orchestration Stack (Workflows and Events)
+  - [x] 9.1 Create EventBridge event bus and rules
     - Create custom event bus for FlowOps events
     - Create rule for S3 document upload events
     - Configure event patterns for document processing
     - _Requirements: 4.3_
-  - [ ] 9.2 Create SNS topic for alerts and escalations
+  - [x] 9.2 Create SNS topic for alerts and escalations
     - Create SNS topic with KMS encryption
     - Configure subscription endpoints
     - _Requirements: 4.4_
@@ -228,13 +228,13 @@
     - **Property 15: S3 Event Notifications for Document Ingestion**
     - **Validates: Requirements 8.1**
 
-- [ ] 10. Implement Observability Stack (Monitoring)
-  - [ ] 10.1 Create CloudWatch dashboard
+- [x] 10. Implement Observability Stack (Monitoring)
+  - [x] 10.1 Create CloudWatch dashboard
     - Create dashboard with key metrics widgets
     - Include latency, error rate, Bedrock invocations
     - Add tenant-level metrics
     - _Requirements: 6.5_
-  - [ ] 10.2 Create CloudWatch alarms
+  - [x] 10.2 Create CloudWatch alarms
     - Create alarm for error rate > 1%
     - Create alarm for P99 latency > 10s
     - Create alarm for Bedrock throttling
@@ -253,13 +253,13 @@
     - **Property 13: CloudWatch Alarms for Critical Metrics**
     - **Validates: Requirements 6.4**
 
-- [ ] 11. Implement IAM and Tenant Isolation
-  - [ ] 11.1 Create tenant-scoped IAM policies
+- [x] 11. Implement IAM and Tenant Isolation
+  - [x] 11.1 Create tenant-scoped IAM policies
     - Create IAM policy construct with tenant conditions
     - Use DynamoDB partition key conditions for data access
     - Use S3 prefix conditions for document access
     - _Requirements: 5.5_
-  - [ ] 11.2 Apply tenant isolation to Lambda execution roles
+  - [x] 11.2 Apply tenant isolation to Lambda execution roles
     - Update Lambda roles with tenant-scoped policies
     - Ensure all data access is tenant-isolated
     - _Requirements: 5.5_
@@ -267,13 +267,13 @@
     - **Property 11: Tenant Isolation in IAM Policies**
     - **Validates: Requirements 5.5**
 
-- [ ] 12. Wire up CDK application entry point
-  - [ ] 12.1 Create main CDK app with all stacks
+- [x] 12. Wire up CDK application entry point
+  - [x] 12.1 Create main CDK app with all stacks
     - Instantiate all stacks in correct dependency order
     - Pass cross-stack references
     - Apply environment configuration
     - _Requirements: 1.2, 1.3_
-  - [ ] 12.2 Add CDK aspects for validation
+  - [x] 12.2 Add CDK aspects for validation
     - Create aspect to validate encryption on all resources
     - Create aspect to validate tagging standards
     - _Requirements: 5.2_

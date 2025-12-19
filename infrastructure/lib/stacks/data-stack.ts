@@ -12,8 +12,8 @@ import { FlowOpsConfig } from '../../config';
 export interface DataStackProps extends cdk.StackProps {
   /** FlowOps configuration */
   readonly config: FlowOpsConfig;
-  /** KMS key ARN from Foundation Stack */
-  readonly kmsKeyArn: string;
+  /** KMS key from Foundation Stack */
+  readonly kmsKey: kms.IKey;
 }
 
 /**
@@ -31,6 +31,16 @@ export class DataStack extends cdk.Stack {
   public readonly tables: FlowOpsTables;
   /** OpenSearch vector search domain */
   public readonly vectorSearch: VectorSearch;
+
+  // Individual table references
+  /** Tickets table */
+  public readonly ticketsTable: any;
+  /** Conversations table */
+  public readonly conversationsTable: any;
+  /** Metadata table */
+  public readonly metadataTable: any;
+  /** OpenSearch domain */
+  public readonly openSearchDomain: any;
 
   // Exported values for cross-stack references
   /** Documents bucket ARN */
@@ -61,8 +71,8 @@ export class DataStack extends cdk.Stack {
     const namePrefix = `flowops-${config.environment}`;
     const removalPolicy = this.getRemovalPolicy(config.removalPolicy);
 
-    // Import KMS key from Foundation Stack
-    const encryptionKey = kms.Key.fromKeyArn(this, 'EncryptionKey', props.kmsKeyArn);
+    // Use KMS key from Foundation Stack
+    const encryptionKey = props.kmsKey;
 
     // Create Documents S3 Bucket
     this.documentsBucket = new SecureBucket(this, 'DocumentsBucket', {
@@ -96,6 +106,13 @@ export class DataStack extends cdk.Stack {
     // Store exported values
     this.documentsBucketArn = this.documentsBucket.bucketArn;
     this.documentsBucketName = this.documentsBucket.bucketName;
+    
+    // Store table references
+    this.ticketsTable = this.tables.ticketsTable;
+    this.conversationsTable = this.tables.conversationsTable;
+    this.metadataTable = this.tables.metadataTable;
+    this.openSearchDomain = this.vectorSearch.domain;
+    
     this.ticketsTableArn = this.tables.ticketsTable.tableArn;
     this.ticketsTableName = this.tables.ticketsTable.tableName;
     this.conversationsTableArn = this.tables.conversationsTable.tableArn;
