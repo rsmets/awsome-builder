@@ -1,0 +1,282 @@
+# Implementation Plan
+
+- [-] 1. Set up project structure and CDK foundation
+  - [ ] 1.1 Initialize monorepo with TypeScript configuration
+    - Create root package.json with workspaces for infrastructure, functions, and packages
+    - Configure TypeScript with strict mode and path aliases
+    - Set up ESLint and Prettier for code consistency
+    - _Requirements: 1.1_
+  - [ ] 1.2 Initialize CDK application structure
+    - Create infrastructure/bin/app.ts entry point
+    - Create infrastructure/lib/stacks/ directory structure
+    - Create infrastructure/lib/constructs/ for reusable constructs
+    - Configure cdk.json with app entry and context
+    - _Requirements: 1.1, 1.2_
+  - [ ] 1.3 Create environment configuration files
+    - Create infrastructure/config/dev.ts with development settings
+    - Create infrastructure/config/staging.ts with staging settings
+    - Create infrastructure/config/prod.ts with production settings
+    - Define configuration interface for type safety
+    - _Requirements: 1.3_
+  - [ ]* 1.4 Write property test for CDK synthesis validity
+    - **Property 1: CDK Synthesis Produces Valid Templates**
+    - **Validates: Requirements 1.2**
+  - [ ]* 1.5 Write property test for environment configuration
+    - **Property 2: Environment Configuration Applied Correctly**
+    - **Validates: Requirements 1.3**
+
+- [ ] 2. Implement Foundation Stack (Security and Identity)
+  - [ ] 2.1 Create KMS customer managed key construct
+    - Create secure-kms-key.ts construct with key rotation enabled
+    - Configure key policy for cross-stack access
+    - Export key ARN for use by other stacks
+    - _Requirements: 5.2_
+  - [ ] 2.2 Create Cognito User Pool and Identity Pool
+    - Configure User Pool with password policies and MFA
+    - Create User Pool Client for web application
+    - Configure Identity Pool for authenticated AWS access
+    - Set up user groups for role-based access (admin, agent)
+    - _Requirements: 5.1_
+  - [ ] 2.3 Assemble Foundation Stack
+    - Create foundation-stack.ts combining KMS and Cognito
+    - Export all required values for cross-stack references
+    - _Requirements: 5.1, 5.2_
+  - [ ]* 2.4 Write property test for Cognito configuration
+    - **Property 8: Cognito User Pool Configuration**
+    - **Validates: Requirements 5.1**
+
+- [ ] 3. Implement Data Stack (Storage Layer)
+  - [ ] 3.1 Create secure S3 bucket construct
+    - Create secure-bucket.ts construct with versioning enabled
+    - Configure server-side encryption with KMS key
+    - Set up lifecycle policies for cost optimization
+    - Block public access
+    - _Requirements: 2.1, 3.3_
+  - [ ] 3.2 Create tenant-isolated DynamoDB table construct
+    - Create tenant-isolated-table.ts construct
+    - Configure on-demand capacity mode
+    - Enable point-in-time recovery
+    - Configure encryption with KMS key
+    - _Requirements: 3.1, 3.2, 5.2_
+  - [ ] 3.3 Create DynamoDB tables for tickets and conversations
+    - Create TicketsTable with GSIs for status and timestamp queries
+    - Create ConversationsTable with GSI for ticket lookup
+    - Create MetadataTable for document approval workflow
+    - _Requirements: 3.1, 3.2, 3.5_
+  - [ ] 3.4 Create OpenSearch domain for vector search
+    - Configure OpenSearch with engine version supporting k-NN
+    - Set up encryption at rest with KMS
+    - Configure appropriate instance types and shard count
+    - Enable fine-grained access control
+    - _Requirements: 2.3, 3.4_
+  - [ ] 3.5 Assemble Data Stack
+    - Create data-stack.ts combining S3, DynamoDB, and OpenSearch
+    - Accept KMS key from Foundation Stack
+    - Export resource ARNs and endpoints
+    - _Requirements: 2.1, 3.1, 3.2, 3.3, 3.4, 3.5_
+  - [ ]* 3.6 Write property test for S3 versioning and encryption
+    - **Property 3: S3 Document Storage with Versioning**
+    - **Validates: Requirements 2.1, 3.3**
+  - [ ]* 3.7 Write property test for OpenSearch configuration
+    - **Property 4: OpenSearch Vector Search Configuration**
+    - **Validates: Requirements 2.3, 3.4**
+  - [ ]* 3.8 Write property test for DynamoDB GSIs
+    - **Property 5: DynamoDB Tables with Required GSIs**
+    - **Validates: Requirements 3.1**
+  - [ ]* 3.9 Write property test for KMS encryption on all storage
+    - **Property 9: KMS Encryption for All Storage Resources**
+    - **Validates: Requirements 5.2**
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 5. Implement Compute Stack (Lambda Functions)
+  - [ ] 5.1 Create shared Lambda function construct
+    - Create base construct with common configuration
+    - Configure X-Ray tracing enabled
+    - Set up CloudWatch log group with retention
+    - Configure VPC placement if needed
+    - _Requirements: 6.1, 6.2_
+  - [ ] 5.2 Create Agent Invoke Lambda
+    - Create function with 1024MB memory and 60s timeout
+    - Look up tenant agent config from DynamoDB
+    - Invoke tenant's Strands agent via AgentCore API
+    - Grant permissions to Bedrock AgentCore, DynamoDB
+    - _Requirements: 2.5.2, 4.1_
+  - [ ] 5.3 Create Safe Actions Lambda
+    - Create function with 256MB memory and 15s timeout
+    - Configure permissions for DynamoDB and SNS
+    - _Requirements: 4.5_
+  - [ ] 5.4 Create Document Ingestion Lambda
+    - Create function with 1024MB memory and 300s timeout
+    - Configure permissions for S3, Bedrock, OpenSearch
+    - _Requirements: 4.2_
+  - [ ] 5.5 Create WebSocket Handler Lambda
+    - Create function with 256MB memory and 10s timeout
+    - Configure permissions for API Gateway management API
+    - _Requirements: 7.5_
+  - [ ] 5.6 Assemble Compute Stack
+    - Create compute-stack.ts combining all Lambda functions
+    - Accept data resource references from Data Stack
+    - Export function ARNs for API integration
+    - _Requirements: 4.1, 6.1, 6.2_
+  - [ ]* 5.7 Write property test for Lambda AI workload configuration
+    - **Property 6: Lambda Functions Configured for AI Workloads**
+    - **Validates: Requirements 4.1**
+  - [ ]* 5.8 Write property test for Lambda observability
+    - **Property 12: Lambda Observability Configuration**
+    - **Validates: Requirements 6.1, 6.2**
+
+- [ ] 6. Implement AI Stack (Bedrock Configuration and AgentCore)
+  - [ ] 6.1 Create Bedrock model access configuration
+    - Configure access to Claude 3 Sonnet for generation
+    - Configure access to Titan Embed Text v2 for embeddings
+    - _Requirements: 2.2, 2.4_
+  - [ ] 6.2 Create Bedrock Guardrail
+    - Configure content filters for harmful content
+    - Set up denied topics (personal advice, medical/legal)
+    - Configure PII handling
+    - _Requirements: 2.4_
+  - [ ] 6.3 Create Agent Configuration DynamoDB table
+    - Create table for storing per-tenant agent configuration
+    - Store agent ARN, alias ID, tool configuration
+    - Configure tenant isolation via partition key
+    - _Requirements: 2.5.1, 2.5.5_
+  - [ ] 6.4 Create Strands Agent definition construct
+    - Define agent with tools for RAG, tickets, and safe actions
+    - Configure agent instruction prompt
+    - Set up tool definitions with schemas
+    - _Requirements: 2.5.2, 2.5.3_
+  - [ ] 6.5 Create Agent Provisioner Lambda
+    - Lambda to create new Strands agents for tenants
+    - Store agent configuration in DynamoDB
+    - Configure tenant-scoped IAM role for agent
+    - _Requirements: 2.5.1_
+  - [ ] 6.6 Assemble AI Stack
+    - Create ai-stack.ts with Bedrock, Guardrail, and AgentCore configuration
+    - Export model IDs, guardrail ARN, and agent config table
+    - _Requirements: 2.2, 2.4, 2.5_
+  - [ ]* 6.7 Write property test for agent configuration table
+    - **Property 16: Agent Configuration Table Structure**
+    - **Validates: Requirements 2.5.1, 2.5.5**
+
+- [ ] 7. Implement API Stack (Gateway Layer)
+  - [ ] 7.1 Create REST API with Cognito authorizer
+    - Create API Gateway REST API
+    - Configure Cognito authorizer for JWT validation
+    - Set up request validators
+    - _Requirements: 7.1, 7.2_
+  - [ ] 7.2 Configure Lambda integrations for agent and actions
+    - Create /chat endpoint with Agent Invoke Lambda integration
+    - Create /actions/{type} endpoint with Safe Actions Lambda
+    - Create CRUD endpoints for tickets, documents, conversations
+    - Create /agents endpoint for agent provisioning (admin)
+    - _Requirements: 7.1, 2.5.1_
+  - [ ] 7.4 Configure CORS and throttling
+    - Enable CORS for web client origins
+    - Create usage plan with rate limiting per tenant
+    - Configure throttling settings
+    - _Requirements: 7.3, 7.4_
+  - [ ] 7.5 Create WebSocket API for streaming
+    - Create WebSocket API with routes ($connect, $disconnect, chat)
+    - Configure Cognito authorizer for $connect
+    - Integrate with WebSocket Handler Lambda
+    - _Requirements: 7.5_
+  - [ ] 7.6 Assemble API Stack
+    - Create api-stack.ts combining REST and WebSocket APIs
+    - Accept Lambda functions from Compute Stack
+    - Accept Cognito from Foundation Stack
+    - Export API endpoints
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - [ ]* 7.7 Write property test for API Gateway security configuration
+    - **Property 14: API Gateway Security Configuration**
+    - **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+  - [ ]* 7.8 Write property test for TLS enforcement
+    - **Property 10: TLS Enforcement on API Endpoints**
+    - **Validates: Requirements 5.3**
+
+- [ ] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 9. Implement Orchestration Stack (Workflows and Events)
+  - [ ] 9.1 Create EventBridge event bus and rules
+    - Create custom event bus for FlowOps events
+    - Create rule for S3 document upload events
+    - Configure event patterns for document processing
+    - _Requirements: 4.3_
+  - [ ] 9.2 Create SNS topic for alerts and escalations
+    - Create SNS topic with KMS encryption
+    - Configure subscription endpoints
+    - _Requirements: 4.4_
+  - [ ] 9.3 Create Step Functions state machine for document ingestion
+    - Create state machine with validation, chunking, embedding, indexing states
+    - Configure error handling and retries
+    - Integrate with Document Ingestion Lambda
+    - _Requirements: 4.2_
+  - [ ] 9.4 Configure S3 event notifications
+    - Connect S3 bucket to EventBridge for object creation events
+    - Trigger ingestion workflow on document upload
+    - _Requirements: 8.1_
+  - [ ] 9.5 Assemble Orchestration Stack
+    - Create orchestration-stack.ts combining EventBridge, SNS, Step Functions
+    - Accept Lambda functions and S3 bucket references
+    - _Requirements: 4.2, 4.3, 4.4, 8.1_
+  - [ ]* 9.6 Write property test for Step Functions pipeline structure
+    - **Property 7: Step Functions Ingestion Pipeline Structure**
+    - **Validates: Requirements 4.2**
+  - [ ]* 9.7 Write property test for S3 event notifications
+    - **Property 15: S3 Event Notifications for Document Ingestion**
+    - **Validates: Requirements 8.1**
+
+- [ ] 10. Implement Observability Stack (Monitoring)
+  - [ ] 10.1 Create CloudWatch dashboard
+    - Create dashboard with key metrics widgets
+    - Include latency, error rate, Bedrock invocations
+    - Add tenant-level metrics
+    - _Requirements: 6.5_
+  - [ ] 10.2 Create CloudWatch alarms
+    - Create alarm for error rate > 1%
+    - Create alarm for P99 latency > 10s
+    - Create alarm for Bedrock throttling
+    - Create alarm for OpenSearch cluster health
+    - Configure SNS notifications for alarms
+    - _Requirements: 6.4_
+  - [ ] 10.3 Configure CloudTrail for audit logging
+    - Enable CloudTrail for API activity logging
+    - Configure log delivery to S3
+    - _Requirements: 5.4_
+  - [ ] 10.4 Assemble Observability Stack
+    - Create observability-stack.ts combining dashboard, alarms, CloudTrail
+    - Accept SNS topic for alarm notifications
+    - _Requirements: 6.4, 6.5, 5.4_
+  - [ ]* 10.5 Write property test for CloudWatch alarms
+    - **Property 13: CloudWatch Alarms for Critical Metrics**
+    - **Validates: Requirements 6.4**
+
+- [ ] 11. Implement IAM and Tenant Isolation
+  - [ ] 11.1 Create tenant-scoped IAM policies
+    - Create IAM policy construct with tenant conditions
+    - Use DynamoDB partition key conditions for data access
+    - Use S3 prefix conditions for document access
+    - _Requirements: 5.5_
+  - [ ] 11.2 Apply tenant isolation to Lambda execution roles
+    - Update Lambda roles with tenant-scoped policies
+    - Ensure all data access is tenant-isolated
+    - _Requirements: 5.5_
+  - [ ]* 11.3 Write property test for tenant isolation
+    - **Property 11: Tenant Isolation in IAM Policies**
+    - **Validates: Requirements 5.5**
+
+- [ ] 12. Wire up CDK application entry point
+  - [ ] 12.1 Create main CDK app with all stacks
+    - Instantiate all stacks in correct dependency order
+    - Pass cross-stack references
+    - Apply environment configuration
+    - _Requirements: 1.2, 1.3_
+  - [ ] 12.2 Add CDK aspects for validation
+    - Create aspect to validate encryption on all resources
+    - Create aspect to validate tagging standards
+    - _Requirements: 5.2_
+
+- [ ] 13. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

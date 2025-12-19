@@ -17,6 +17,9 @@ The project is organized as a monorepo containing both CDK infrastructure code a
 - **CDK_Stack**: An AWS CDK construct representing a deployable unit of infrastructure
 - **Safe_Action**: A system action (create ticket, request logs, escalate) that requires explicit human confirmation
 - **Grounded_Response**: An AI response that includes citations to source documents
+- **Agent_Layer**: Components managing Bedrock AgentCore agents and Strands orchestration
+- **Strands_Agent**: An AI agent built with the Strands framework that can use tools and maintain conversation state
+- **Agent_Swarm**: A collection of specialized agents (scheduling, KB, messaging) that collaborate to handle complex requests
 
 ## Requirements
 
@@ -42,6 +45,18 @@ The project is organized as a monorepo containing both CDK infrastructure code a
 3. WHEN vector search is required THEN the Knowledge_Layer SHALL query Amazon OpenSearch Service configured with vector search capabilities
 4. WHEN AI generation is requested THEN the Knowledge_Layer SHALL invoke Amazon Bedrock foundation models with configured guardrails
 5. WHEN the RAG_Pipeline cannot find relevant sources THEN the Chat_Orchestrator SHALL refuse to answer rather than generate ungrounded responses
+
+### Requirement 2.5: Bedrock AgentCore and Strands Agents
+
+**User Story:** As a platform operator, I want AI agents powered by Bedrock AgentCore with Strands, so that each tenant has dedicated intelligent agents that can be expanded to multi-agent swarms.
+
+#### Acceptance Criteria
+
+1. WHEN a tenant is provisioned THEN the Agent_Layer SHALL create a dedicated Bedrock AgentCore agent for that tenant
+2. WHEN the agent processes requests THEN the Agent_Layer SHALL use Strands framework for agent orchestration and tool use
+3. WHEN the agent needs knowledge THEN the Agent_Layer SHALL connect to the tenant's knowledge base via RAG tools
+4. WHEN the platform scales THEN the Agent_Layer SHALL support expansion to multi-agent swarms per tenant with specialized agents for scheduling, knowledge base, and messaging
+5. WHEN agents are configured THEN the Agent_Layer SHALL isolate agent resources and conversation history per tenant
 
 ### Requirement 3: Data Storage Infrastructure
 

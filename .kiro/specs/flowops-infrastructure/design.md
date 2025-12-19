@@ -22,13 +22,15 @@ graph TB
     end
 
     subgraph "Compute Layer"
-        RAGLambda[RAG Orchestrator Lambda]
+        AgentLambda[Agent Invoke Lambda]
         ActionLambda[Safe Actions Lambda]
         IngestionLambda[Document Ingestion Lambda]
     end
 
     subgraph "AI Layer"
-        Bedrock[Amazon Bedrock]
+        AgentCore[Bedrock AgentCore]
+        StrandsAgent[Strands Agent per Tenant]
+        Bedrock[Amazon Bedrock LLM]
         BedrockEmbed[Bedrock Embeddings]
         BedrockGuard[Bedrock Guardrails]
     end
@@ -57,12 +59,13 @@ graph TB
     AdminUI --> APIGW
     APIGW --> Cognito
     WSAPI --> Cognito
-    APIGW -->|Simple Chat| Bedrock
-    APIGW --> ActionLambda
-    WSAPI --> RAGLambda
-    RAGLambda --> Bedrock
-    RAGLambda --> OpenSearch
-    RAGLambda --> BedrockEmbed
+    APIGW --> AgentLambda
+    WSAPI --> AgentLambda
+    AgentLambda --> AgentCore
+    AgentCore --> StrandsAgent
+    StrandsAgent --> Bedrock
+    StrandsAgent --> OpenSearch
+    StrandsAgent --> DynamoDB
     Bedrock --> BedrockGuard
     ActionLambda --> DynamoDB
     ActionLambda --> SNS
@@ -72,7 +75,6 @@ graph TB
     S3Docs --> EventBridge
     EventBridge --> StepFn
     StepFn --> IngestionLambda
-    RAGLambda --> DynamoDB
     DynamoDB --> KMS
     S3Docs --> KMS
     OpenSearch --> KMS
@@ -80,18 +82,18 @@ graph TB
 
 ### Architecture Notes
 
-**Direct API Gateway to Bedrock Integration:**
-For simple chat requests that don't require RAG (retrieval), API Gateway can invoke Bedrock directly using AWS service integrations. This eliminates Lambda cold starts and reduces latency for straightforward Q&A.
+**Bedrock AgentCore with Strands:**
+All chat requests route through Bedrock AgentCore agents built with the Strands framework. Each tenant has a dedicated agent with access to tools for RAG, ticket management, and safe actions. This provides:
+- Consistent agent behavior with tool use
+- Per-tenant isolation and customization
+- Foundation for multi-agent swarms (Phase 2)
 
-**When to use direct integration:**
-- Simple conversational queries
-- Follow-up questions in existing context
-- Requests that don't need knowledge base retrieval
-
-**When to use Lambda (RAG Orchestrator):**
-- Queries requiring knowledge base search
-- Complex multi-step reasoning with citations
-- Requests needing conversation history from DynamoDB
+**Agent Invocation Flow:**
+1. API Gateway authenticates request and extracts tenant ID
+2. Agent Invoke Lambda looks up tenant's agent configuration
+3. Lambda invokes the tenant's Strands agent via AgentCore
+4. Agent uses tools (RAG, tickets, actions) as needed
+5. Response streamed back via WebSocket or returned via REST
 
 ### Project Directory Structure
 
@@ -194,35 +196,36 @@ Handles all client-facing API endpoints.
 | BedrockIntegration | API Gateway | Direct Bedrock invocation for simple chat |
 
 **REST API Endpoints:**
-- `POST /chat` - Send chat message (direct to Bedrock for simple queries)
-- `POST /chat/rag` - Send chat message with RAG retrieval (via Lambda)
+- `POST /chat` - Send chat message (invokes tenant's Strands agent)
 - `GET /conversations/{id}` - Get conversation history
 - `POST /tickets` - Create ticket
 - `GET /tickets` - List tickets
 - `POST /documents` - Upload document
 - `GET /documents` - List documents
 - `POST /actions/{type}` - Execute safe action
+- `POST /agents` - Provision new agent for tenant (admin only)
+- `GET /agents/{tenantId}` - Get agent configuration
 
 **WebSocket Routes:**
 - `$connect` - Establish connection with auth
 - `$disconnect` - Clean up connection
-- `chat` - Stream chat responses (via RAG Lambda for knowledge-grounded responses)
+- `chat` - Stream chat responses from Strands agent
 - `status` - Receive action status updates
 
-**Direct Bedrock Integration:**
-The `/chat` endpoint uses API Gateway AWS service integration to invoke Bedrock directly, bypassing Lambda for simple conversational queries. This reduces latency by eliminating cold starts. The integration uses VTL templates to transform requests/responses and applies Bedrock Guardrails for content safety.
+**Agent-Based Architecture:**
+All chat requests route through the Agent Invoke Lambda which calls the tenant's dedicated Strands agent. The agent has tools for RAG retrieval, ticket management, and safe actions. This provides consistent behavior and enables future expansion to multi-agent swarms.
 
 ### Compute Stack
 
-Lambda functions for business logic. Note: Simple chat requests bypass Lambda entirely via direct API Gateway to Bedrock integration.
+Lambda functions for business logic. All chat requests route through the Agent Invoke Lambda which calls the tenant's Strands agent.
 
 | Function | Memory | Timeout | Purpose |
 |----------|--------|---------|---------|
-| RAGOrchestrator | 1024 MB | 60s | Vector search + Bedrock generation with citations |
+| AgentInvoke | 1024 MB | 60s | Invoke tenant's Strands agent via AgentCore |
 | SafeActions | 256 MB | 15s | Execute approved actions (create ticket, escalate, etc.) |
 | DocumentIngestion | 1024 MB | 300s | Chunk, embed, index documents |
 | WebSocketHandler | 256 MB | 10s | Manage WebSocket connections |
-| ConversationPersist | 256 MB | 10s | Save conversation history to DynamoDB |
+| AgentProvisioner | 512 MB | 120s | Create/update Strands agents for tenants |
 
 **Lambda Environment Variables:**
 - `TICKETS_TABLE_NAME`
@@ -231,25 +234,88 @@ Lambda functions for business logic. Note: Simple chat requests bypass Lambda en
 - `OPENSEARCH_ENDPOINT`
 - `BEDROCK_MODEL_ID`
 - `KMS_KEY_ARN`
+- `AGENT_CONFIG_TABLE_NAME`
 
-**Why no ChatHandler Lambda?**
-Simple chat requests use API Gateway's direct AWS service integration with Bedrock, eliminating Lambda cold starts and reducing P99 latency. The RAGOrchestrator Lambda is only invoked when knowledge base retrieval is needed.
+**Agent Invoke Lambda:**
+This Lambda is the entry point for all chat requests. It:
+1. Extracts tenant ID from the authenticated request
+2. Looks up the tenant's agent ARN from DynamoDB
+3. Invokes the Strands agent via Bedrock AgentCore API
+4. Streams or returns the agent's response
 
 ### AI Stack
 
-Amazon Bedrock configuration and guardrails.
+Amazon Bedrock configuration, guardrails, and AgentCore agents.
 
 | Component | Configuration | Purpose |
 |-----------|---------------|---------|
 | BedrockModelAccess | Claude 3 Sonnet | Foundation model for generation |
 | TitanEmbeddings | Titan Embed Text v2 | Document and query embeddings |
 | Guardrail | Content filters | Block harmful content, enforce citations |
+| AgentCore | Strands Agent | Per-tenant intelligent agent with tools |
 
 **Bedrock Guardrail Configuration:**
 - Denied topics: Personal advice, medical/legal guidance
 - Content filters: Hate, violence, sexual content
 - Word filters: Competitor names, profanity
 - PII handling: Anonymize in responses
+
+### AgentCore and Strands Architecture
+
+Each tenant gets a dedicated Bedrock AgentCore agent built with the Strands framework. The agent has access to tools for RAG retrieval, ticket management, and safe actions.
+
+**Phase 1: Single Agent per Tenant**
+
+```mermaid
+graph TB
+    subgraph "Tenant A"
+        AgentA[Strands Agent]
+        AgentA --> RAGTool[RAG Tool]
+        AgentA --> TicketTool[Ticket Tool]
+        AgentA --> ActionTool[Safe Action Tool]
+    end
+    
+    RAGTool --> OpenSearch
+    TicketTool --> DynamoDB
+    ActionTool --> SNS
+```
+
+**Agent Tools:**
+| Tool | Purpose |
+|------|---------|
+| `search_knowledge_base` | Query OpenSearch for relevant documents |
+| `create_ticket` | Create support ticket (requires confirmation) |
+| `get_ticket_history` | Retrieve ticket and conversation history |
+| `escalate_to_human` | Route to human agent |
+| `request_logs` | Request diagnostic logs (requires confirmation) |
+
+**Phase 2: Agent Swarm per Tenant (Future)**
+
+```mermaid
+graph TB
+    subgraph "Tenant A Swarm"
+        Orchestrator[Orchestrator Agent]
+        Orchestrator --> KBAgent[Knowledge Agent]
+        Orchestrator --> ScheduleAgent[Scheduling Agent]
+        Orchestrator --> MsgAgent[Messaging Agent]
+    end
+    
+    KBAgent --> OpenSearch
+    ScheduleAgent --> Calendar[Calendar API]
+    MsgAgent --> SNS
+```
+
+**Swarm Agents (Phase 2):**
+- **Orchestrator**: Routes requests to specialized agents
+- **Knowledge Agent**: Handles RAG queries and document retrieval
+- **Scheduling Agent**: Manages appointments and follow-ups
+- **Messaging Agent**: Handles notifications and escalations
+
+**Tenant Isolation for Agents:**
+- Each agent has tenant-scoped IAM role
+- Agent memory/conversation stored in tenant-partitioned DynamoDB
+- Knowledge base queries filtered by tenant ID
+- Agent ARN stored in tenant configuration
 
 ### Orchestration Stack
 
@@ -390,6 +456,40 @@ interface VectorEmbedding {
 }
 ```
 
+### Agent Configuration
+
+```typescript
+interface AgentConfig {
+  tenantId: string;
+  agentId: string;
+  agentArn: string;
+  agentAliasId: string;
+  agentType: 'single' | 'swarm';
+  tools: AgentTool[];
+  guardrailId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AgentTool {
+  name: string;
+  description: string;
+  enabled: boolean;
+  requiresConfirmation: boolean; // For safe actions
+}
+
+// Phase 2: Swarm configuration
+interface SwarmConfig {
+  tenantId: string;
+  orchestratorAgentId: string;
+  specializedAgents: {
+    knowledge?: string;    // Agent ID for KB queries
+    scheduling?: string;   // Agent ID for scheduling
+    messaging?: string;    // Agent ID for notifications
+  };
+}
+```
+
 
 
 ## Correctness Properties
@@ -487,6 +587,12 @@ The following properties can be verified by testing the synthesized CloudFormati
 *For any* S3 bucket configured for document uploads, the bucket SHALL have event notifications configured to trigger the ingestion workflow on object creation.
 
 **Validates: Requirements 8.1**
+
+### Property 16: Agent Configuration Table Structure
+
+*For any* DynamoDB table created for agent configuration, the table SHALL have a partition key for tenant ID and store agent ARN, alias ID, and tool configuration.
+
+**Validates: Requirements 2.5.1, 2.5.5**
 
 ## Phase 2: Voice Extension (Future)
 
